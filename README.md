@@ -172,8 +172,8 @@ GET  /enrollments/:courseId/check                   Verificar inscripción
 | `/dashboard/estudiante` | Mis cursos y progreso | ✅ |
 | `/dashboard/tutor` | Estadísticas y cursos | ✅ |
 | `/dashboard/admin` | Métricas y aprobaciones | ✅ |
-| `/checkout/[courseId]` | Flujo de pago Stripe | 🔄 En desarrollo |
-| `/certificado/[id]` | Verificación pública | 🔄 En desarrollo |
+| `/checkout/[courseId]` | Flujo de pago Stripe | ⏳ Pendiente |
+| `/certificado/[id]` | Verificación pública | ⏳ Pendiente |
 
 ---
 
@@ -182,8 +182,8 @@ GET  /enrollments/:courseId/check                   Verificar inscripción
 ```
 ✅ Mes 1-2   Frontend completo (plantillas + auth + dashboards)
 ✅ Mes 3-4   Backend completo (Prisma + Auth + Users + Courses)
-✅ Mes 4-5   Integración (Lessons + Enrollments + datos reales)
-🔄 Mes 5-6   Videos con AWS S3
+🔄 Mes 4-5   Integración (Lessons + Enrollments + datos reales)
+⏳ Mes 5-6   Videos con AWS S3
 ⏳ Mes 6-7   Reseñas + foro + certificados PDF
 ⏳ Mes 7-8   Pagos con Stripe
 ⏳ Mes 8-9   Deploy + CI/CD
@@ -196,7 +196,7 @@ GET  /enrollments/:courseId/check                   Verificar inscripción
 
 **Carlos Esteban Rojas Ibarra**  
 carlosrojas9928@gmail.com  
-[LinkedIn](https://linkedin.com/in/tu-perfil) · [GitHub](https://github.com/carlosrojas9928)
+[LinkedIn](https://www.linkedin.com/in/carlos-esteban-rojas/) · [GitHub](https://github.com/carlosrojas9928)
 
 ---
 
