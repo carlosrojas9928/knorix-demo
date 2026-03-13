@@ -23,11 +23,14 @@ KNORIX es una plataforma SaaS de cursos online con modelo de suscripción mensua
 
 ### Planes para tutores
 
-| Plan | Precio/mes | Cursos | Estudiantes |
-|------|-----------|--------|-------------|
-| Básico | $15.000 COP | 3 | 100 |
-| Pro ⭐ | $35.000 COP | 10 | 500 |
-| Ilimitado | $70.000 COP | Ilimitado | Sin límite |
+| Plan | Precio/mes | Cursos | Estudiantes | Destacado |
+|------|-----------|--------|-------------|-----------|
+| Básico | $15.000 COP | 3 | 100 | — |
+| Pro ⭐ | $35.000 COP | 10 | 500 | Más popular |
+| Ilimitado | $70.000 COP | Ilimitado | Sin límite | — |
+| Agencia 🏢 | $120.000 COP | Ilimitado | Sin límite | Multi-tutor |
+
+> **Add-ons premium:** Certificados con marca del tutor · Dominio personalizado · Analíticas avanzadas · Soporte prioritario
 
 ---
 
