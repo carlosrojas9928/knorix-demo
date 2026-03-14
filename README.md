@@ -68,7 +68,6 @@ KNORIX es una plataforma SaaS de cursos online con modelo de suscripción mensua
 ---
 
 ## Arquitectura
-
 ```
 knorix/
 ├── frontend/          # Next.js 14 — App Router
@@ -83,7 +82,7 @@ knorix/
         ├── users/     # Perfiles y roles
         ├── courses/   # CRUD de cursos
         ├── lessons/   # Lecciones por curso
-        ├── enrollments/ # Inscripciones y progreso
+        ├── enrollments/ # Inscripciones, progreso y certificados
         └── prisma/    # Servicio de base de datos
 ```
 
@@ -100,7 +99,6 @@ knorix/
 ## Base de Datos — Modelos Prisma
 
 El schema cuenta con **12 modelos** relacionados:
-
 ```
 User ─── TutorProfile
   │
@@ -147,19 +145,35 @@ DELETE /courses/:id     Eliminar curso
 
 ### Lessons
 ```
-POST   /courses/:courseId/lessons          Crear lección
-GET    /courses/:courseId/lessons          Listar lecciones
-PATCH  /courses/:courseId/lessons/:id      Editar lección
-DELETE /courses/:courseId/lessons/:id      Eliminar lección
+POST   /courses/:courseId/lessons        Crear lección
+GET    /courses/:courseId/lessons        Listar lecciones
+PATCH  /courses/:courseId/lessons/:id    Editar lección
+DELETE /courses/:courseId/lessons/:id    Eliminar lección
 ```
 
 ### Enrollments
 ```
-POST /enrollments/:courseId                         Inscribirse
-GET  /enrollments/me                                Mis inscripciones
-POST /enrollments/:courseId/lessons/:id/complete    Completar lección
-GET  /enrollments/:courseId/check                   Verificar inscripción
+POST /enrollments/:courseId                       Inscribirse
+GET  /enrollments/me                              Mis inscripciones
+POST /enrollments/:courseId/lessons/:id/complete  Completar lección
+GET  /enrollments/:courseId/check                 Verificar inscripción
 ```
+
+> El progreso se calcula automáticamente tras cada lección completada.
+> Al llegar al 100% se genera un certificado con código UUID verificable públicamente.
+
+---
+
+## Snippets incluidos
+
+Este repositorio expone fragmentos representativos de cada capa del proyecto.
+
+| Archivo | Qué demuestra |
+|---------|---------------|
+| `snippets/schema.prisma` | Diseño de BD relacional — 12 modelos, relaciones 1:N y N:M |
+| `snippets/auth.service.ts` | Seguridad — JWT, bcrypt, access + refresh tokens |
+| `snippets/api.ts` | Integración full stack — cliente centralizado con Bearer token automático |
+| `snippets/enrollments.service.ts` | Lógica de negocio — progreso por lección, cálculo automático, certificado al 100% |
 
 ---
 
@@ -172,21 +186,20 @@ GET  /enrollments/:courseId/check                   Verificar inscripción
 | `/auth/registro` | Registro en 2 pasos | ✅ |
 | `/cursos` | Explorador con filtros | ✅ |
 | `/cursos/[slug]` | Detalle de curso | ✅ |
-| `/dashboard/estudiante` | Mis cursos y progreso | ✅ |
-| `/dashboard/tutor` | Estadísticas y cursos | ✅ |
-| `/dashboard/admin` | Métricas y aprobaciones | ✅ |
-| `/checkout/[courseId]` | Flujo de pago Stripe | ⏳ Pendiente |
-| `/certificado/[id]` | Verificación pública | ⏳ Pendiente |
+| `/dashboard/estudiante` | Mis cursos y progreso real | ✅ |
+| `/dashboard/tutor` | Estadísticas y cursos reales | ✅ |
+| `/dashboard/admin` | Métricas y aprobaciones reales | ✅ |
+| `/checkout/[courseId]` | Flujo de pago Stripe | ⏳ Mes 7-8 |
+| `/certificado/[id]` | Verificación pública de certificado | ⏳ Mes 6-7 |
 
 ---
 
 ## Estado del Proyecto
-
 ```
 ✅ Mes 1-2   Frontend completo (plantillas + auth + dashboards)
 ✅ Mes 3-4   Backend completo (Prisma + Auth + Users + Courses)
-🔄 Mes 4-5   Integración (Lessons + Enrollments + datos reales)
-⏳ Mes 5-6   Videos con AWS S3
+✅ Mes 4-5   Integración (Lessons + Enrollments + dashboards con datos reales)
+⏳ Mes 5-6   Videos con AWS S3 + CloudFront
 ⏳ Mes 6-7   Reseñas + foro + certificados PDF
 ⏳ Mes 7-8   Pagos con Stripe
 ⏳ Mes 8-9   Deploy + CI/CD
