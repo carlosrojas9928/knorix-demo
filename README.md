@@ -21,13 +21,14 @@ KNORIX es una plataforma SaaS de cursos online con modelo de suscripción mensua
 - **Certificados únicos** — código UUID verificable desde URL pública sin autenticación
 - **Progreso automático** — el certificado se genera al completar el 100%
 - **Videos seguros** — upload directo a S3, reproducción por CloudFront con URLs firmadas
+- **Suscripciones recurrentes** — 4 planes con Stripe, webhooks y validación de límites en tiempo real
 
 ### Planes para tutores
 
 | Plan       | Precio/mes   | Cursos    | Estudiantes | Destacado   |
 |------------|--------------|-----------|-------------|-------------|
 | Básico     | $15.000 COP  | 3         | 100         | —           |
-| Pro ⭐      | $35.000 COP  | 10        | 500         | Más popular |
+| Pro ⭐      | $35.000 COP  | 5         | 500         | Más popular |
 | Ilimitado  | $70.000 COP  | Ilimitado | Sin límite  | —           |
 | Agencia 🏢 | $120.000 COP | Ilimitado | Sin límite  | Multi-tutor |
 
@@ -49,25 +50,26 @@ KNORIX es una plataforma SaaS de cursos online con modelo de suscripción mensua
 
 ### Backend
 
-| Tecnología           | Versión | Uso                |
-|----------------------|---------|--------------------|
-| NestJS               | 11.x    | Framework API REST |
-| TypeScript           | 5.x     | Lenguaje           |
-| Prisma               | 5.x     | ORM                |
-| PostgreSQL           | 18.x    | Base de datos      |
-| JWT + Refresh Tokens | —       | Autenticación      |
-| AWS SDK v3           | —       | Integración con S3 |
+| Tecnología           | Versión | Uso                      |
+|----------------------|---------|--------------------------|
+| NestJS               | 11.x    | Framework API REST       |
+| TypeScript           | 5.x     | Lenguaje                 |
+| Prisma               | 5.x     | ORM                      |
+| PostgreSQL           | 18.x    | Base de datos            |
+| JWT + Refresh Tokens | —       | Autenticación            |
+| AWS SDK v3           | —       | Integración con S3       |
+| Stripe SDK           | —       | Suscripciones y webhooks |
 
 ### Infraestructura
 
-| Tecnología     | Uso                                       |
-|----------------|-------------------------------------------|
-| AWS S3         | Almacenamiento de videos                  |
-| AWS CloudFront | CDN — entrega segura con URLs firmadas    |
-| Stripe         | Pagos y suscripciones (Mes 7-8)           |
-| Railway        | Deploy del backend                        |
-| Vercel         | Deploy del frontend                       |
-| GitHub Actions | CI/CD                                     |
+| Tecnología     | Uso                                      |
+|----------------|------------------------------------------|
+| AWS S3         | Almacenamiento de videos                 |
+| AWS CloudFront | CDN — entrega segura con URLs firmadas   |
+| Stripe         | Suscripciones recurrentes + webhooks     |
+| Railway        | Deploy del backend                       |
+| Vercel         | Deploy del frontend                      |
+| GitHub Actions | CI/CD                                    |
 
 ---
 
@@ -75,57 +77,130 @@ KNORIX es una plataforma SaaS de cursos online con modelo de suscripción mensua
 
 ```
 knorix/
-├── frontend/                      # Next.js 14 — App Router
+├── frontend/                        # Next.js 14 — App Router
 │   └── src/
 │       ├── app/
-│       │   ├── cursos/[slug]/page.tsx         ← detalle con reseñas
-│       │   └── certificado/[code]/page.tsx    ← verificación pública ← Nuevo Mes 6-7
+│       │   ├── cursos/[slug]/page.tsx
+│       │   ├── certificado/[code]/page.tsx
+│       │   └── dashboard/tutor/
+│       │       └── suscripcion/page.tsx       ← Nuevo Mes 7-8
 │       ├── components/
 │       │   ├── course/
 │       │   │   ├── VideoPlayer.tsx
 │       │   │   └── UploadDropzone.tsx
 │       │   └── reviews/
-│       │       └── ReviewForm.tsx             ← Nuevo Mes 6-7
+│       │       └── ReviewForm.tsx
 │       └── lib/
-│           └── api.ts
-└── backend/                       # NestJS API REST
+│           └── api.ts                         ← subscriptionsApi agregado
+└── backend/                         # NestJS API REST
     └── src/
         ├── auth/
         ├── users/
-        ├── courses/
+        ├── courses/                           ← canCreateCourse() integrado
         ├── lessons/
-        ├── enrollments/
+        ├── enrollments/                       ← canEnrollStudent() integrado
         ├── storage/
-        ├── reviews/               ← Nuevo Mes 6-7
-        │   ├── reviews.service.ts
-        │   ├── reviews.controller.ts
-        │   └── reviews.module.ts
-        ├── certificates/          ← Nuevo Mes 6-7
-        │   ├── certificates.service.ts
-        │   ├── certificates.controller.ts
-        │   └── certificates.module.ts
+        ├── reviews/
+        ├── certificates/
+        ├── forum/
+        ├── payments/
+        ├── subscriptions/                     ← Nuevo Mes 7-8
+        │   ├── subscriptions.service.ts
+        │   ├── subscriptions.controller.ts
+        │   └── subscriptions.module.ts
         └── prisma/
 ```
 
 ### Roles del sistema
 
-| Rol            | Descripción                                                  |
-|----------------|--------------------------------------------------------------|
-| **Estudiante** | Explora, se inscribe, accede a cursos y deja reseñas.        |
-| **Tutor**      | Crea y publica cursos, sube videos, gestiona lecciones.      |
-| **Admin**      | Aprueba tutores, modera contenido, gestiona planes.          |
+| Rol            | Descripción                                                    |
+|----------------|----------------------------------------------------------------|
+| **Estudiante** | Explora, se inscribe, accede a cursos y deja reseñas.          |
+| **Tutor**      | Paga suscripción, crea cursos, sube videos, gestiona lecciones.|
+| **Admin**      | Aprueba tutores, modera contenido, gestiona planes.            |
 
 ---
 
-## Novedades Mes 6-7
+## Sistema de Suscripciones — Mes 7-8
 
-### 1. Sistema de reseñas verificadas
+### Flujo de suscripción del tutor
 
-Solo estudiantes inscritos pueden dejar reseña — validado contra la tabla `Enrollment` antes de permitir el POST. Una reseña por estudiante por curso. Cada nueva reseña recalcula automáticamente el rating promedio del curso con `Prisma aggregate()`.
+```
+Tutor elige plan en /dashboard/tutor/suscripcion
+       │
+       ▼
+POST /subscriptions/checkout { plan: "PRO" }
+       │
+       ▼
+Backend crea sesión en Stripe Checkout
+       │
+       ▼
+Tutor paga con tarjeta en Stripe (15.000 COP/mes)
+       │
+       ▼
+Stripe envía webhook → POST /subscriptions/webhook
+       │
+       ▼
+Backend verifica firma HMAC-SHA256
+       │
+       ▼
+Prisma upsert → Subscription activada en BD
+       │
+       ▼
+Tutor regresa al dashboard con plan activo
+```
 
-### 2. Certificados con UUID verificable públicamente
+### Validación de límites en tiempo real
 
-El certificado se genera automáticamente al completar el 100% del progreso. Lo nuevo: un endpoint público `GET /certificates/:code` que **no requiere autenticación** — cualquier empresa o persona puede verificar si el certificado es legítimo directamente desde una URL, sin crear cuenta en KNORIX.
+```
+Tutor intenta crear un curso
+       │
+       ▼
+CoursesService.create()
+       │
+       ▼
+canCreateCourse() → consulta Subscription + cuenta cursos actuales
+       │
+       ├── Plan activo + dentro del límite → ✅ continúa
+       └── Sin plan o límite superado      → ❌ 400 Bad Request
+           "Tu plan BASIC permite máximo 3 cursos."
+```
+
+### Eventos de webhook manejados
+
+| Evento                            | Acción en BD                        |
+|-----------------------------------|-------------------------------------|
+| `checkout.session.completed`      | Delegado a PaymentsService          |
+| `customer.subscription.created`   | upsert Subscription → ACTIVE        |
+| `customer.subscription.updated`   | upsert Subscription → actualiza plan|
+| `customer.subscription.deleted`   | updateMany → CANCELLED              |
+| `invoice.payment_succeeded`       | Crea registro en Payment            |
+| `invoice.payment_failed`          | updateMany → PAST_DUE               |
+
+> Los planes se leen dinámicamente desde la BD por `stripePriceId` — sin mapas hardcodeados.
+
+---
+
+## Base de Datos — Modelos Prisma
+
+El schema cuenta con **12 modelos** relacionados:
+
+```
+User ─── TutorProfile
+  │
+  ├── Course ─── Category
+  │     │
+  │     └── Lesson ─── LessonProgress
+  │                    (videoUrl: key de S3)
+  │
+  ├── Enrollment ─── LessonProgress
+  ├── Review
+  ├── Certificate
+  ├── Payment
+  ├── Subscription        ← status: ACTIVE | PENDING | CANCELLED | PAST_DUE
+  ├── ForumPost
+  └── Plan                ← stripePriceId dinámico
+```
 
 ---
 
@@ -142,7 +217,7 @@ POST /auth/logout       Cerrar sesión
 ### Courses
 ```
 GET    /courses           Listar cursos (con filtros)
-POST   /courses           Crear curso (tutor)
+POST   /courses           Crear curso — valida límite del plan activo
 GET    /courses/mine      Mis cursos (tutor autenticado)
 GET    /courses/:slug     Detalle de curso
 PATCH  /courses/:id       Editar curso
@@ -151,7 +226,7 @@ DELETE /courses/:id       Eliminar curso
 
 ### Enrollments
 ```
-POST /enrollments/:courseId                       Inscribirse
+POST /enrollments/:courseId                       Inscribirse — valida límite del plan
 GET  /enrollments/me                              Mis inscripciones
 POST /enrollments/:courseId/lessons/:id/complete  Completar lección
 GET  /enrollments/:courseId/check                 Verificar inscripción
@@ -166,35 +241,46 @@ GET /storage/view-url?key=courses/xxx/videos/uuid.mp4
     → URL firmada CloudFront 2h   (estudiante inscrito)
 ```
 
-### Reviews ← Nuevo Mes 6-7
+### Reviews
 ```
-POST   /reviews/:courseId        Crear reseña (estudiante inscrito)
-GET    /reviews/:courseId        Listar reseñas del curso
-PATCH  /reviews/:courseId        Editar mi reseña
-DELETE /reviews/:courseId        Eliminar mi reseña
+POST   /reviews/:courseId   Crear reseña (estudiante inscrito)
+GET    /reviews/:courseId   Listar reseñas del curso
+PATCH  /reviews/:courseId   Editar mi reseña
+DELETE /reviews/:courseId   Eliminar mi reseña
 ```
 
-### Certificates ← Nuevo Mes 6-7
+### Certificates
 ```
-GET /certificates/me             Mis certificados (autenticado)
-GET /certificates/:code          Verificar certificado (público — sin auth)
+GET /certificates/me        Mis certificados (autenticado)
+GET /certificates/:code     Verificar certificado (público — sin auth)
+```
+
+### Subscriptions ← Nuevo Mes 7-8
+```
+POST /subscriptions/checkout        Crear sesión de pago en Stripe
+GET  /subscriptions/me              Plan activo + uso actual
+POST /subscriptions/cancel          Cancelar al final del periodo
+POST /subscriptions/billing-portal  Portal de facturación de Stripe
+POST /subscriptions/webhook         Eventos de Stripe (sin auth)
 ```
 
 ---
 
 ## Snippets incluidos
 
-| Archivo                           | Qué demuestra                                                                      |
-|-----------------------------------|------------------------------------------------------------------------------------|
-| `snippets/schema.prisma`          | Diseño de BD relacional — 12 modelos, relaciones 1:N y N:M                         |
-| `snippets/auth.service.ts`        | Seguridad — JWT, bcrypt, access + refresh tokens                                   |
-| `snippets/api.ts`                 | Integración full stack — cliente centralizado con Bearer token automático          |
-| `snippets/enrollments.service.ts` | Lógica de negocio — progreso por lección, cálculo automático, certificado al 100%  |
-| `snippets/storage.service.ts`     | AWS S3 — generación de presigned URLs con SDK v3                                   |
-| `snippets/upload-dropzone.tsx`    | Upload directo a S3 desde el navegador con barra de progreso                       |
-| `snippets/video-player.tsx`       | Reproducción segura con URL firmada, marcado automático al 90%                     |
-| `snippets/reviews.service.ts`     | Reseñas verificadas — validación de inscripción + recálculo de rating con aggregate|
-| `snippets/certificates.service.ts`| Certificado público — endpoint sin auth, verificación por UUID                     |
+| Archivo                             | Qué demuestra                                                                      |
+|-------------------------------------|------------------------------------------------------------------------------------|
+| `snippets/schema.prisma`            | Diseño de BD relacional — 12 modelos, relaciones 1:N y N:M                         |
+| `snippets/auth.service.ts`          | Seguridad — JWT, bcrypt, access + refresh tokens                                   |
+| `snippets/api.ts`                   | Integración full stack — cliente centralizado con Bearer token automático          |
+| `snippets/enrollments.service.ts`   | Lógica de negocio — progreso por lección, cálculo automático, certificado al 100%  |
+| `snippets/storage.service.ts`       | AWS S3 — generación de presigned URLs con SDK v3                                   |
+| `snippets/upload-dropzone.tsx`      | Upload directo a S3 desde el navegador con barra de progreso                       |
+| `snippets/video-player.tsx`         | Reproducción segura con URL firmada, marcado automático al 90%                     |
+| `snippets/reviews.service.ts`       | Reseñas verificadas — validación de inscripción + recálculo de rating              |
+| `snippets/certificates.service.ts`  | Certificado público — endpoint sin auth, verificación por UUID                     |
+| `snippets/forum.service.ts`         | Foro por curso — jerarquía de eliminación y paginación                             |
+| `snippets/subscriptions.service.ts` | Stripe — checkout, webhooks HMAC, cancelación y validación de límites por plan     |
 
 ---
 
@@ -206,30 +292,31 @@ GET /certificates/:code          Verificar certificado (público — sin auth)
 | `/auth/login`                                 | Login conectado con backend         | ✅         |
 | `/auth/registro`                              | Registro en 2 pasos                 | ✅         |
 | `/cursos`                                     | Explorador con filtros              | ✅         |
-| `/cursos/[slug]`                              | Detalle de curso + reseñas          | ✅ Mes 6-7 |
-| `/cursos/[slug]/lecciones/[lessonId]`         | Reproductor de video + progreso     | ✅ Mes 5-6 |
-| `/certificado/[code]`                         | Verificación pública de certificado | ✅ Mes 6-7 |
+| `/cursos/[slug]`                              | Detalle de curso + reseñas          | ✅         |
+| `/cursos/[slug]/lecciones/[lessonId]`         | Reproductor de video + progreso     | ✅         |
+| `/certificado/[code]`                         | Verificación pública de certificado | ✅         |
 | `/dashboard/estudiante`                       | Mis cursos y progreso real          | ✅         |
 | `/dashboard/tutor`                            | Estadísticas y cursos reales        | ✅         |
-| `/dashboard/tutor/cursos/[id]/lecciones/[id]` | Upload de video por lección         | ✅ Mes 5-6 |
+| `/dashboard/tutor/suscripcion`                | Planes, plan activo y uso real      | ✅ Mes 7-8 |
+| `/dashboard/tutor/cursos/[id]/lecciones/[id]` | Upload de video por lección         | ✅         |
 | `/dashboard/admin`                            | Métricas y aprobaciones reales      | ✅         |
-| `/checkout/[courseId]`                        | Flujo de pago Stripe                | ⏳ Mes 7-8 |
+| `/checkout/[courseId]`                        | Flujo de pago Stripe (estudiantes)  | ⏳ Mes 8-9 |
 
 ---
 
 ## Screenshots
 
-### Certificado verificado — válido
-![Certificado válido](screenshots/certificado-valido.png)
+### Página de suscripción — grid de 4 planes
+![Planes suscripción](screenshots/suscripcion-planes.png)
 
-### Certificado no válido — validación del sistema
-![Certificado inválido](screenshots/certificado-invalido.png)
+### Stripe Checkout — página de pago 15.000 COP/mes
+![Stripe Checkout](screenshots/stripe-checkout.png)
 
-### Reseñas verificadas en página del curso
-![Reseñas](screenshots/resenas-curso.png)
+### Error 400 — límite del plan superado
+![Límite plan](screenshots/limite-plan-error.png)
 
-### Formulario de reseña con calificación por estrellas
-![Review form](screenshots/review-form.png)
+### Stripe Dashboard — webhooks recibidos exitosamente
+![Webhook Stripe](screenshots/stripe-webhook.png)
 
 ---
 
@@ -240,10 +327,11 @@ GET /certificates/:code          Verificar certificado (público — sin auth)
 ✅ Mes 3-4   Backend completo (Prisma + Auth + Users + Courses)
 ✅ Mes 4-5   Integración full stack (Lessons + Enrollments + datos reales)
 ✅ Mes 5-6   Videos con AWS S3 + CloudFront + VideoPlayer + UploadDropzone
-✅ Mes 6-7   Reseñas verificadas + certificados con UUID verificable públicamente
-⏳ Mes 7-8   Pagos con Stripe
-⏳ Mes 8-9   Deploy + CI/CD
-⏳ Mes 9-12  Beta + lanzamiento público
+✅ Mes 6-7   Reseñas verificadas + foro + certificados con UUID verificable
+✅ Mes 7-8   Suscripciones recurrentes con Stripe + webhooks + validación de límites
+⏳ Mes 8-9   Pagos de estudiantes (checkout por curso + reembolsos)
+⏳ Mes 9-10  Deploy + CI/CD
+⏳ Mes 10-12 Beta + lanzamiento público
 ```
 
 ---
