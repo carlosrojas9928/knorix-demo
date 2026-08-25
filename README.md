@@ -2,9 +2,11 @@
 
 > Conecta tutores verificados con estudiantes. Sin comisiones — el tutor fija el precio y se queda con todo.
 
-![Status](https://img.shields.io/badge/estado-en%20desarrollo-F59E0B)
+![Status](https://img.shields.io/badge/estado-en%20producci%C3%B3n-10B981)
 ![Stack](https://img.shields.io/badge/stack-Next.js%20%7C%20NestJS%20%7C%20PostgreSQL-5B9BD5)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)
+
+**En producción:** [knorix-ten.vercel.app](https://knorix-ten.vercel.app) · API: `knorix-backend.onrender.com`
 
 ---
 
@@ -62,14 +64,19 @@ KNORIX es una plataforma SaaS de cursos online con modelo de suscripción mensua
 
 ### Infraestructura
 
-| Tecnología     | Uso                                      |
-|----------------|------------------------------------------|
-| AWS S3         | Almacenamiento de videos                 |
-| AWS CloudFront | CDN — entrega segura con URLs firmadas   |
-| Stripe         | Suscripciones recurrentes + webhooks     |
-| Railway        | Deploy del backend                       |
-| Vercel         | Deploy del frontend                      |
-| GitHub Actions | CI/CD                                    |
+| Tecnología     | Uso                                                | Estado                  |
+|----------------|-----------------------------------------------------|--------------------------|
+| Render         | Deploy del backend (Web Service)                   | ✅ En producción          |
+| Neon           | PostgreSQL gestionado, serverless                  | ✅ En producción          |
+| Upstash        | Redis gestionado (TCP)                             | ✅ En producción          |
+| Vercel         | Deploy del frontend, dominio con SSL automático     | ✅ En producción          |
+| Stripe         | Suscripciones recurrentes + webhooks                | ✅ En producción (modo test) |
+| AWS S3         | Almacenamiento de videos                            | ⏳ Pendiente — actualmente `STORAGE_DRIVER=local` |
+| AWS CloudFront | CDN — entrega segura con URLs firmadas              | ⏳ Pendiente (depende de S3) |
+| GitHub Actions | CI/CD — build/lint en PRs y deploy automático       | ⏳ Pendiente — Mes 9-10   |
+| Sentry         | Monitoreo de errores                                | ⏳ Pendiente — DSN real por configurar |
+
+> El deploy actual es manual vía dashboard (Render "Manual Deploy" + auto-deploy simple de Vercel en push a `master`), sin pipeline de verificación previa. La automatización con GitHub Actions es el próximo objetivo de infraestructura.
 
 ---
 
@@ -92,23 +99,33 @@ knorix/
 │       │       └── ReviewForm.tsx
 │       └── lib/
 │           └── api.ts                         ← subscriptionsApi agregado
-└── backend/                         # NestJS API REST
+└── backend/                         # NestJS API REST — arquitectura modular
     └── src/
-        ├── auth/
-        ├── users/
-        ├── courses/                           ← canCreateCourse() integrado
+        ├── admin/                              Panel administrativo (moderación, aprobaciones)
+        ├── auth/                               JWT + refresh tokens
+        ├── categories/                         Categorías de cursos
+        ├── certificates/                       Certificados verificables por UUID
+        ├── config/                             Configuración centralizada (env, validación)
+        ├── courses/                             ← canCreateCourse() integrado
+        ├── email/                              Envío transaccional (Resend)
+        ├── enrollments/                         ← canEnrollStudent() integrado
+        ├── forum/                              Foro por curso
         ├── lessons/
-        ├── enrollments/                       ← canEnrollStudent() integrado
-        ├── storage/
-        ├── reviews/
-        ├── certificates/
-        ├── forum/
-        ├── payments/
-        ├── subscriptions/                     ← Nuevo Mes 7-8
+        ├── mail/                               Plantillas y colas de correo
+        ├── notifications/                      WebSocket (socket.io) en tiempo real
+        ├── payments/                           Compra de cursos, reembolsos, historial
+        ├── plans/                              Planes dinámicos (stripePriceId en BD)
+        ├── preferences/                        Preferencias de usuario
+        ├── prisma/                             Cliente y esquema ORM
+        ├── reviews/                            Reseñas verificadas
+        ├── stats/                              Endpoint público de estadísticas
+        ├── storage/                            Presigned URLs S3/local
+        ├── subscriptions/                       ← Nuevo Mes 7-8
         │   ├── subscriptions.service.ts
         │   ├── subscriptions.controller.ts
         │   └── subscriptions.module.ts
-        └── prisma/
+        ├── tutor/                              Perfil y panel del tutor
+        └── users/
 ```
 
 ### Roles del sistema
@@ -177,7 +194,7 @@ canCreateCourse() → consulta Subscription + cuenta cursos actuales
 | `invoice.payment_succeeded`       | Crea registro en Payment            |
 | `invoice.payment_failed`          | updateMany → PAST_DUE               |
 
-> Los planes se leen dinámicamente desde la BD por `stripePriceId` — sin mapas hardcodeados.
+> Los planes se leen dinámicamente desde la BD por `stripePriceId` — sin mapas hardcodeados. En producción, el endpoint `/subscriptions/webhook` tiene su propio signing secret (`STRIPE_WEBHOOK_SECRET`), independiente del usado en desarrollo local.
 
 ---
 
@@ -201,6 +218,8 @@ User ─── TutorProfile
   ├── ForumPost
   └── Plan                ← stripePriceId dinámico
 ```
+
+En producción, las migraciones se aplican con `prisma migrate deploy` (nunca `migrate dev`) como parte del Start Command de Render, y el seed inicial se corrió una vez de forma manual apuntando a la base de Neon.
 
 ---
 
@@ -300,7 +319,7 @@ POST /subscriptions/webhook         Eventos de Stripe (sin auth)
 | `/dashboard/tutor/suscripcion`                | Planes, plan activo y uso real      | ✅ Mes 7-8 |
 | `/dashboard/tutor/cursos/[id]/lecciones/[id]` | Upload de video por lección         | ✅         |
 | `/dashboard/admin`                            | Métricas y aprobaciones reales      | ✅         |
-| `/checkout/[courseId]`                        | Flujo de pago Stripe (estudiantes)  | ⏳ Mes 8-9 |
+| `/checkout/[courseId]`                        | Flujo de pago Stripe (estudiantes)  | ⏳ Próximo |
 
 ---
 
@@ -318,6 +337,12 @@ POST /subscriptions/webhook         Eventos de Stripe (sin auth)
 ### Stripe Dashboard — webhooks recibidos exitosamente
 ![Webhook Stripe](screenshots/stripe-webhook.png)
 
+### Render — deploy en producción
+![Deploy Render](screenshots/render-deploy-live.png)
+
+### Vercel — frontend desplegado
+![Deploy Vercel](screenshots/produccion-live.png)
+
 ---
 
 ## Estado del Proyecto
@@ -329,8 +354,8 @@ POST /subscriptions/webhook         Eventos de Stripe (sin auth)
 ✅ Mes 5-6   Videos con AWS S3 + CloudFront + VideoPlayer + UploadDropzone
 ✅ Mes 6-7   Reseñas verificadas + foro + certificados con UUID verificable
 ✅ Mes 7-8   Suscripciones recurrentes con Stripe + webhooks + validación de límites
-⏳ Mes 8-9   Pagos de estudiantes (checkout por curso + reembolsos)
-⏳ Mes 9-10  Deploy + CI/CD
+✅ Mes 8-9   Deploy en producción — Vercel + Render + Neon + Upstash + webhook de Stripe
+⏳ Mes 9-10  CI/CD con GitHub Actions + AWS S3/CloudFront + pagos de estudiantes
 ⏳ Mes 10-12 Beta + lanzamiento público
 ```
 
